@@ -1,80 +1,47 @@
 package com.dev.dev_track.service;
 
-import com.dev.dev_track.dto.ResponseDto;
+import com.dev.dev_track.dto.ApiResponse;
 import com.dev.dev_track.dto.UserDto;
 import com.dev.dev_track.entities.UserEntity;
+import com.dev.dev_track.exception.DuplicateResourceException;
+import com.dev.dev_track.exception.ResourceNotFoundException;
 import com.dev.dev_track.repo.UserRepo;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.Optional;
-
 @Service
+@RequiredArgsConstructor
 public class UserService {
+
     private final UserRepo userRepo;
+    private final PasswordEncoder passwordEncoder;
 
-    private final Logger log = LogManager.getLogger(UserService.class);
-
-    public UserService(UserRepo userRepo) {
-        this.userRepo = userRepo;
+    public ApiResponse<Void> saveUser(UserDto userDto) {
+        if (userRepo.existsByEmail(userDto.getEmail())) {
+            throw new DuplicateResourceException("Email already in use");
+        }
+        userRepo.save(UserEntity.builder()
+                .userName(userDto.getUsername())
+                .email(userDto.getEmail())
+                .password(passwordEncoder.encode(userDto.getPassword()))
+                .isActive(true)
+                .build());
+        return ApiResponse.ok("User saved successfully");
     }
 
-    public ResponseDto saveUser(UserDto userDto){
-        try {
-            UserEntity save = userRepo.save(UserEntity.builder()
-                    .userName(userDto.getUsername())
-                    .email(userDto.getEmail())
-                    .password(userDto.getPassword())
-                    .build());
+    public ApiResponse<Void> updateUser(UserDto userDto) {
+        UserEntity user = userRepo.findById(userDto.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-            if(save != null){
-                return new ResponseDto(200, "User has been saved successfully");
-            }else {
-                return new ResponseDto(400, "User is not saved successfully");
-            }
-        }catch (Exception e){
-            e.printStackTrace();
-            log.error(e.getMessage());
-            return new ResponseDto(500, "OOPS! Something went Wrong..");
+        if (!user.getEmail().equals(userDto.getEmail())
+                && userRepo.existsByEmail(userDto.getEmail())) {
+            throw new DuplicateResourceException("Email already in use");
         }
-    }
 
-    public ResponseDto updateUser(UserDto userDto) {
-        try {
-            int isHave = userRepo.countByEmail(userDto.getEmail());
-
-            if (isHave > 0) {
-                log.info("Email already exist");
-                return new ResponseDto(400, "Email already exist");
-            }
-
-            Optional<UserEntity> user = userRepo.findByUserId(userDto.getId());
-
-            if (user.isPresent()) {
-                UserEntity userEntity = user.get();
-
-                userEntity.setUserName(userDto.getUsername());
-                userEntity.setEmail(userDto.getEmail());
-
-                UserEntity save = userRepo.save(userEntity);
-
-                if(save != null){
-                    log.info("User has been saved successfully");
-                    return new ResponseDto(200, "User has been saved successfully");
-                }else  {
-                    log.info("User is not saved successfully");
-                    return new ResponseDto(400, "User is not saved successfully");
-                }
-
-            }else {
-                log.info("User not found");
-                return new ResponseDto(400, "User not found");
-            }
-        }catch (Exception e){
-            e.printStackTrace();
-            log.error(e.getMessage());
-            return new ResponseDto(500, "OOPS! Something went Wrong..");
-        }
+        user.setUserName(userDto.getUsername());
+        user.setEmail(userDto.getEmail());
+        userRepo.save(user);
+        return ApiResponse.ok("User updated successfully");
     }
 }

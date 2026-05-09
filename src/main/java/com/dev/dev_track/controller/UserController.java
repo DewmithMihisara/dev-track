@@ -1,38 +1,31 @@
 package com.dev.dev_track.controller;
 
-import com.dev.dev_track.dto.ResponseDto;
+import com.dev.dev_track.dto.ApiResponse;
 import com.dev.dev_track.dto.UserDto;
 import com.dev.dev_track.service.UserService;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
 
 @RestController
 @RequestMapping("/user")
-@CrossOrigin(origins = "*")
-@Tag(name = "user Controller", description = "user related operations...")
+@RequiredArgsConstructor
+@Tag(name = "User Controller", description = "User profile operations")
 public class UserController {
+
     private final UserService userService;
 
-    private final Logger log = LogManager.getLogger(UserController.class);
-
-    public UserController(UserService userService) {
-        this.userService = userService;
+    @PostMapping
+    public ResponseEntity<ApiResponse<Void>> create(@Valid @RequestBody UserDto userDto) {
+        return ResponseEntity.status(201).body(userService.saveUser(userDto));
     }
 
-    @PostMapping
-    public ResponseDto createUserOrUpdate(@RequestBody UserDto userDto) {
-        try {
-            if (userDto.getId() == null) {
-                return userService.saveUser(userDto);
-            }else {
-                return userService.updateUser(userDto);
-            }
-        }catch (Exception e){
-            log.error(e.getMessage());
-            return new ResponseDto(400, "User is not saved successfully");
-        }
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> update(
+            @PathVariable Long id, @Valid @RequestBody UserDto userDto) {
+        userDto.setId(id);
+        return ResponseEntity.ok(userService.updateUser(userDto));
     }
 }
